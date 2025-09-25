@@ -7,31 +7,24 @@ import {
   STTProvider,
   ElevenLabsModel,
 } from "@heygen/streaming-avatar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useMemoizedFn, useUnmount } from "ahooks";
 
-import { Button } from "./Button";
-import { AvatarConfig } from "./AvatarConfig";
 import { AvatarVideo } from "./AvatarSession/AvatarVideo";
 import { useStreamingAvatarSession } from "./logic/useStreamingAvatarSession";
-import { AvatarControls } from "./AvatarSession/AvatarControls";
 import { useVoiceChat } from "./logic/useVoiceChat";
 import { StreamingAvatarProvider, StreamingAvatarSessionState } from "./logic";
-import { LoadingIcon } from "./Icons";
-import { MessageHistory } from "./AvatarSession/MessageHistory";
-
-import { AVATARS } from "@/app/lib/constants";
 
 const DEFAULT_CONFIG: StartAvatarRequest = {
-  quality: AvatarQuality.Low,
-  avatarName: AVATARS[0].avatar_id,
-  knowledgeId: undefined,
+  quality: AvatarQuality.High,
+  avatarName: "02cb65bd014c44678b8c630064706cd9",
+  knowledgeId: "6f44bb0ea8674324b88a586552935fb2",
   voice: {
     rate: 1.5,
-    emotion: VoiceEmotion.EXCITED,
+    emotion: VoiceEmotion.FRIENDLY,
     model: ElevenLabsModel.eleven_flash_v2_5,
   },
-  language: "en",
+  language: "fr",
   voiceChatTransport: VoiceChatTransport.WEBSOCKET,
   sttSettings: {
     provider: STTProvider.DEEPGRAM,
@@ -42,8 +35,8 @@ function InteractiveAvatar() {
   const { initAvatar, startAvatar, stopAvatar, sessionState, stream } =
     useStreamingAvatarSession();
   const { startVoiceChat } = useVoiceChat();
-
-  const [config, setConfig] = useState<StartAvatarRequest>(DEFAULT_CONFIG);
+  const configRef = useRef<StartAvatarRequest>(DEFAULT_CONFIG);
+  const hasStartedRef = useRef(false);
 
   const mediaStream = useRef<HTMLVideoElement>(null);
 
@@ -65,6 +58,7 @@ function InteractiveAvatar() {
 
   const startSessionV2 = useMemoizedFn(async (isVoiceChat: boolean) => {
     try {
+      console.debug("[UI] startSessionV2 invoked", { isVoiceChat });
       const newToken = await fetchAccessToken();
       const avatar = initAvatar(newToken);
 
@@ -99,9 +93,10 @@ function InteractiveAvatar() {
         console.log(">>>>> Avatar end message:", event);
       });
 
-      await startAvatar(config);
+      await startAvatar(configRef.current);
 
       if (isVoiceChat) {
+        console.debug("[UI] Triggering voice chat start");
         await startVoiceChat();
       }
     } catch (error) {
@@ -117,41 +112,66 @@ function InteractiveAvatar() {
     if (stream && mediaStream.current) {
       mediaStream.current.srcObject = stream;
       mediaStream.current.onloadedmetadata = () => {
-        mediaStream.current!.play();
+        mediaStream.current
+          ?.play()
+          .then(() => {
+            console.debug("[UI] Media element playback started");
+          })
+          .catch((error) => {
+            console.warn("[UI] Unable to autoplay media element", error);
+          });
       };
     }
   }, [mediaStream, stream]);
 
+  const requestStart = useMemoizedFn(() => {
+    if (sessionState !== StreamingAvatarSessionState.INACTIVE) {
+      return;
+    }
+
+    console.debug("[UI] Launching avatar session from screen tap");
+    hasStartedRef.current = true;
+    startSessionV2(true);
+  });
+
+  const handleScreenClick = useMemoizedFn(() => {
+    if (
+      sessionState === StreamingAvatarSessionState.CONNECTED ||
+      sessionState === StreamingAvatarSessionState.CONNECTING
+    ) {
+      console.debug("[UI] Stopping avatar session from screen tap");
+      hasStartedRef.current = false;
+      stopAvatar();
+      return;
+    }
+
+    if (
+      sessionState === StreamingAvatarSessionState.INACTIVE &&
+      !hasStartedRef.current
+    ) {
+      requestStart();
+    }
+  });
+
   return (
-    <div className="w-full flex flex-col gap-4">
-      <div className="flex flex-col rounded-xl bg-zinc-900 overflow-hidden">
-        <div className="relative w-full aspect-video overflow-hidden flex flex-col items-center justify-center">
-          {sessionState !== StreamingAvatarSessionState.INACTIVE ? (
-            <AvatarVideo ref={mediaStream} />
-          ) : (
-            <AvatarConfig config={config} onConfigChange={setConfig} />
-          )}
-        </div>
-        <div className="flex flex-col gap-3 items-center justify-center p-4 border-t border-zinc-700 w-full">
-          {sessionState === StreamingAvatarSessionState.CONNECTED ? (
-            <AvatarControls />
-          ) : sessionState === StreamingAvatarSessionState.INACTIVE ? (
-            <div className="flex flex-row gap-4">
-              <Button onClick={() => startSessionV2(true)}>
-                Start Voice Chat
-              </Button>
-              <Button onClick={() => startSessionV2(false)}>
-                Start Text Chat
-              </Button>
-            </div>
-          ) : (
-            <LoadingIcon />
-          )}
-        </div>
+    <div
+      className="flex min-h-screen w-screen items-center justify-center bg-black"
+      onClick={handleScreenClick}
+    >
+      <div className="relative h-screen w-screen">
+        <AvatarVideo ref={mediaStream} />
+        {sessionState === StreamingAvatarSessionState.INACTIVE && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white">
+            Cliquez pour lancer l'avatar vocal (cliquez de nouveau pour arrêter)
+          </div>
+        )}
+        {sessionState === StreamingAvatarSessionState.CONNECTING && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white">
+            Connexion en cours...
+          </div>
+        )}
+        <div className="absolute bottom-1 right-1 h-[150px] w-[150px] rounded-lg bg-black" />
       </div>
-      {sessionState === StreamingAvatarSessionState.CONNECTED && (
-        <MessageHistory />
-      )}
     </div>
   );
 }

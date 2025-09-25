@@ -35,6 +35,10 @@ export const useStreamingAvatarSession = () => {
 
   const init = useCallback(
     (token: string) => {
+      console.debug("[Session] Initializing StreamingAvatar instance", {
+        hasToken: !!token,
+        basePath,
+      });
       avatarRef.current = new StreamingAvatar({
         token,
         basePath: basePath,
@@ -47,6 +51,11 @@ export const useStreamingAvatarSession = () => {
 
   const handleStream = useCallback(
     ({ detail }: { detail: MediaStream }) => {
+      console.debug("[Session] Received media stream", {
+        id: detail?.id,
+        audioTracks: detail?.getAudioTracks().length,
+        videoTracks: detail?.getVideoTracks().length,
+      });
       setStream(detail);
       setSessionState(StreamingAvatarSessionState.CONNECTED);
     },
@@ -54,6 +63,7 @@ export const useStreamingAvatarSession = () => {
   );
 
   const stop = useCallback(async () => {
+    console.debug("[Session] Stopping avatar session");
     avatarRef.current?.off(StreamingEvents.STREAM_READY, handleStream);
     avatarRef.current?.off(StreamingEvents.STREAM_DISCONNECTED, stop);
     clearMessages();
@@ -94,40 +104,72 @@ export const useStreamingAvatarSession = () => {
       }
 
       setSessionState(StreamingAvatarSessionState.CONNECTING);
+      console.debug("[Session] Starting avatar", {
+        language: config.language,
+        avatarName: config.avatarName,
+        knowledgeId: config.knowledgeId,
+      });
       avatarRef.current.on(StreamingEvents.STREAM_READY, handleStream);
       avatarRef.current.on(StreamingEvents.STREAM_DISCONNECTED, stop);
       avatarRef.current.on(
         StreamingEvents.CONNECTION_QUALITY_CHANGED,
-        ({ detail }: { detail: ConnectionQuality }) =>
-          setConnectionQuality(detail),
+        ({ detail }: { detail: ConnectionQuality }) => {
+          console.debug("[Session] Connection quality changed", detail);
+          setConnectionQuality(detail);
+        },
       );
       avatarRef.current.on(StreamingEvents.USER_START, () => {
+        console.debug("[Session] Detected user start talking event");
         setIsUserTalking(true);
       });
       avatarRef.current.on(StreamingEvents.USER_STOP, () => {
+        console.debug("[Session] Detected user stop talking event");
         setIsUserTalking(false);
       });
       avatarRef.current.on(StreamingEvents.AVATAR_START_TALKING, () => {
+        console.debug("[Session] Avatar started talking");
         setIsAvatarTalking(true);
       });
       avatarRef.current.on(StreamingEvents.AVATAR_STOP_TALKING, () => {
+        console.debug("[Session] Avatar stopped talking");
         setIsAvatarTalking(false);
       });
       avatarRef.current.on(
         StreamingEvents.USER_TALKING_MESSAGE,
-        handleUserTalkingMessage,
+        (event: CustomEvent<any>) => {
+          console.debug(
+            "[Session] User talking message",
+            event?.detail?.message,
+          );
+          handleUserTalkingMessage(event as unknown as { detail: any });
+        },
       );
       avatarRef.current.on(
         StreamingEvents.AVATAR_TALKING_MESSAGE,
-        handleStreamingTalkingMessage,
+        (event: CustomEvent<any>) => {
+          console.debug(
+            "[Session] Avatar talking message",
+            event?.detail?.message,
+          );
+          handleStreamingTalkingMessage(event as unknown as { detail: any });
+        },
       );
-      avatarRef.current.on(StreamingEvents.USER_END_MESSAGE, handleEndMessage);
-      avatarRef.current.on(
-        StreamingEvents.AVATAR_END_MESSAGE,
-        handleEndMessage,
-      );
+      avatarRef.current.on(StreamingEvents.USER_END_MESSAGE, () => {
+        console.debug("[Session] User end message");
+        handleEndMessage();
+      });
+      avatarRef.current.on(StreamingEvents.AVATAR_END_MESSAGE, () => {
+        console.debug("[Session] Avatar end message");
+        handleEndMessage();
+      });
 
-      await avatarRef.current.createStartAvatar(config);
+      try {
+        await avatarRef.current.createStartAvatar(config);
+        console.debug("[Session] Avatar session created");
+      } catch (error) {
+        console.error("[Session] Failed to create avatar session", error);
+        throw error;
+      }
 
       return avatarRef.current;
     },

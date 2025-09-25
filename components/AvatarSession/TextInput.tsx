@@ -9,6 +9,16 @@ import { useTextChat } from "../logic/useTextChat";
 import { Input } from "../Input";
 import { useConversationState } from "../logic/useConversationState";
 
+const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  [TaskType.TALK]: "Converser",
+  [TaskType.REPEAT]: "Repeter",
+};
+
+const TASK_MODE_LABELS: Record<TaskMode, string> = {
+  [TaskMode.SYNC]: "Synchrone",
+  [TaskMode.ASYNC]: "Asynchrone",
+};
+
 export const TextInput: React.FC = () => {
   const { sendMessage, sendMessageSync, repeatMessage, repeatMessageSync } =
     useTextChat();
@@ -68,20 +78,22 @@ export const TextInput: React.FC = () => {
       <Select
         isSelected={(option) => option === taskType}
         options={Object.values(TaskType)}
-        renderOption={(option) => option.toUpperCase()}
-        value={taskType.toUpperCase()}
+        renderOption={(option) => TASK_TYPE_LABELS[option]}
+        value={TASK_TYPE_LABELS[taskType]}
         onSelect={setTaskType}
       />
       <Select
         isSelected={(option) => option === taskMode}
         options={Object.values(TaskMode)}
-        renderOption={(option) => option.toUpperCase()}
-        value={taskMode.toUpperCase()}
+        renderOption={(option) => TASK_MODE_LABELS[option]}
+        value={TASK_MODE_LABELS[taskMode]}
         onSelect={setTaskMode}
       />
       <Input
         className="min-w-[500px]"
-        placeholder={`Type something for the avatar to ${taskType === TaskType.REPEAT ? "repeat" : "respond"}...`}
+        placeholder={`Ecrire un message pour que l'avatar ${
+          taskType === TaskType.REPEAT ? "repete" : "reponde"
+        }...`}
         value={message}
         onChange={setMessage}
       />

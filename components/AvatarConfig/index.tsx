@@ -15,6 +15,35 @@ import { Field } from "./Field";
 
 import { AVATARS, STT_LANGUAGE_LIST } from "@/app/lib/constants";
 
+const QUALITY_LABELS: Record<AvatarQuality, string> = {
+  [AvatarQuality.Low]: "Basse",
+  [AvatarQuality.Medium]: "Moyenne",
+  [AvatarQuality.High]: "Haute",
+};
+
+const TRANSPORT_LABELS: Record<VoiceChatTransport, string> = {
+  [VoiceChatTransport.WEBSOCKET]: "WebSocket",
+  [VoiceChatTransport.LIVEKIT]: "LiveKit",
+};
+
+const EMOTION_LABELS: Record<VoiceEmotion, string> = {
+  [VoiceEmotion.EXCITED]: "Enthousiaste",
+  [VoiceEmotion.SERIOUS]: "Serieuse",
+  [VoiceEmotion.FRIENDLY]: "Amicale",
+  [VoiceEmotion.SOOTHING]: "Apaisante",
+  [VoiceEmotion.BROADCASTER]: "Diffuseur",
+};
+
+const ELEVEN_MODEL_LABELS: Record<ElevenLabsModel, string> = {
+  [ElevenLabsModel.eleven_flash_v2_5]: "Eleven Flash v2.5",
+  [ElevenLabsModel.eleven_multilingual_v2]: "Eleven Multilingual v2",
+};
+
+const STT_PROVIDER_LABELS: Record<STTProvider, string> = {
+  [STTProvider.DEEPGRAM]: "Deepgram",
+  [STTProvider.GLADIA]: "Gladia",
+};
+
 interface AvatarConfigProps {
   onConfigChange: (config: StartAvatarRequest) => void;
   config: StartAvatarRequest;
@@ -40,7 +69,7 @@ export const AvatarConfig: React.FC<AvatarConfigProps> = ({
     if (!avatar) {
       return {
         isCustom: true,
-        name: "Custom Avatar ID",
+        name: "ID d'avatar personnalise",
         avatarId: null,
       };
     } else {
@@ -52,16 +81,32 @@ export const AvatarConfig: React.FC<AvatarConfigProps> = ({
     }
   }, [config.avatarName]);
 
+  const selectedQualityLabel = config.quality
+    ? QUALITY_LABELS[config.quality]
+    : undefined;
+  const selectedTransportLabel = config.voiceChatTransport
+    ? TRANSPORT_LABELS[config.voiceChatTransport]
+    : undefined;
+  const selectedEmotionLabel = config.voice?.emotion
+    ? EMOTION_LABELS[config.voice.emotion]
+    : undefined;
+  const selectedModelLabel = config.voice?.model
+    ? ELEVEN_MODEL_LABELS[config.voice.model]
+    : undefined;
+  const selectedProviderLabel = config.sttSettings?.provider
+    ? STT_PROVIDER_LABELS[config.sttSettings.provider]
+    : undefined;
+
   return (
-    <div className="relative flex flex-col gap-4 w-[550px] py-8 max-h-full overflow-y-auto px-4">
-      <Field label="Custom Knowledge Base ID">
+    <div className="relative flex w-full max-w-3xl flex-col gap-4 px-4 py-8">
+      <Field label="ID de base de connaissances">
         <Input
-          placeholder="Enter custom knowledge base ID"
+          placeholder="Saisir l'ID de base de connaissances"
           value={config.knowledgeId}
           onChange={(value) => onChange("knowledgeId", value)}
         />
       </Field>
-      <Field label="Avatar ID">
+      <Field label="ID de l'avatar">
         <Select
           isSelected={(option) =>
             typeof option === "string"
@@ -69,14 +114,16 @@ export const AvatarConfig: React.FC<AvatarConfigProps> = ({
               : option.avatar_id === selectedAvatar?.avatarId
           }
           options={[...AVATARS, "CUSTOM"]}
-          placeholder="Select Avatar"
+          placeholder="Choisir un avatar"
           renderOption={(option) => {
             return typeof option === "string"
-              ? "Custom Avatar ID"
+              ? "ID d'avatar personnalise"
               : option.name;
           }}
           value={
-            selectedAvatar?.isCustom ? "Custom Avatar ID" : selectedAvatar?.name
+            selectedAvatar?.isCustom
+              ? "ID d'avatar personnalise"
+              : selectedAvatar?.name
           }
           onSelect={(option) => {
             if (typeof option === "string") {
@@ -88,15 +135,15 @@ export const AvatarConfig: React.FC<AvatarConfigProps> = ({
         />
       </Field>
       {selectedAvatar?.isCustom && (
-        <Field label="Custom Avatar ID">
+        <Field label="ID d'avatar personnalise">
           <Input
-            placeholder="Enter custom avatar ID"
+            placeholder="Saisir l'ID de l'avatar"
             value={config.avatarName}
             onChange={(value) => onChange("avatarName", value)}
           />
         </Field>
       )}
-      <Field label="Language">
+      <Field label="Langue">
         <Select
           isSelected={(option) => option.value === config.language}
           options={STT_LANGUAGE_LIST}
@@ -108,32 +155,32 @@ export const AvatarConfig: React.FC<AvatarConfigProps> = ({
           onSelect={(option) => onChange("language", option.value)}
         />
       </Field>
-      <Field label="Avatar Quality">
+      <Field label="Qualite de l'avatar">
         <Select
           isSelected={(option) => option === config.quality}
           options={Object.values(AvatarQuality)}
-          renderOption={(option) => option}
-          value={config.quality}
+          renderOption={(option) => QUALITY_LABELS[option]}
+          value={selectedQualityLabel}
           onSelect={(option) => onChange("quality", option)}
         />
       </Field>
-      <Field label="Voice Chat Transport">
+      <Field label="Transport du chat vocal">
         <Select
           isSelected={(option) => option === config.voiceChatTransport}
           options={Object.values(VoiceChatTransport)}
-          renderOption={(option) => option}
-          value={config.voiceChatTransport}
+          renderOption={(option) => TRANSPORT_LABELS[option]}
+          value={selectedTransportLabel}
           onSelect={(option) => onChange("voiceChatTransport", option)}
         />
       </Field>
       {showMore && (
         <>
-          <h1 className="text-zinc-100 w-full text-center mt-5">
-            Voice Settings
+          <h1 className="mt-5 w-full text-center text-zinc-100">
+            Parametres vocaux
           </h1>
-          <Field label="Custom Voice ID">
+          <Field label="ID de voix personnalise">
             <Input
-              placeholder="Enter custom voice ID"
+              placeholder="Saisir l'ID de la voix"
               value={config.voice?.voiceId}
               onChange={(value) =>
                 onChange("voice", { ...config.voice, voiceId: value })
@@ -144,33 +191,33 @@ export const AvatarConfig: React.FC<AvatarConfigProps> = ({
             <Select
               isSelected={(option) => option === config.voice?.emotion}
               options={Object.values(VoiceEmotion)}
-              renderOption={(option) => option}
-              value={config.voice?.emotion}
+              renderOption={(option) => EMOTION_LABELS[option]}
+              value={selectedEmotionLabel}
               onSelect={(option) =>
                 onChange("voice", { ...config.voice, emotion: option })
               }
             />
           </Field>
-          <Field label="ElevenLabs Model">
+          <Field label="Modele ElevenLabs">
             <Select
               isSelected={(option) => option === config.voice?.model}
               options={Object.values(ElevenLabsModel)}
-              renderOption={(option) => option}
-              value={config.voice?.model}
+              renderOption={(option) => ELEVEN_MODEL_LABELS[option]}
+              value={selectedModelLabel}
               onSelect={(option) =>
                 onChange("voice", { ...config.voice, model: option })
               }
             />
           </Field>
-          <h1 className="text-zinc-100 w-full text-center mt-5">
-            STT Settings
+          <h1 className="mt-5 w-full text-center text-zinc-100">
+            Parametres STT
           </h1>
-          <Field label="Provider">
+          <Field label="Fournisseur">
             <Select
               isSelected={(option) => option === config.sttSettings?.provider}
               options={Object.values(STTProvider)}
-              renderOption={(option) => option}
-              value={config.sttSettings?.provider}
+              renderOption={(option) => STT_PROVIDER_LABELS[option]}
+              value={selectedProviderLabel}
               onSelect={(option) =>
                 onChange("sttSettings", {
                   ...config.sttSettings,
@@ -185,7 +232,7 @@ export const AvatarConfig: React.FC<AvatarConfigProps> = ({
         className="text-zinc-400 text-sm cursor-pointer w-full text-center bg-transparent"
         onClick={() => setShowMore(!showMore)}
       >
-        {showMore ? "Show less" : "Show more..."}
+        {showMore ? "Afficher moins" : "Afficher plus..."}
       </button>
     </div>
   );
