@@ -11,6 +11,7 @@ import { useEffect, useRef } from "react";
 import { useMemoizedFn, useUnmount } from "ahooks";
 
 import { AvatarVideo } from "./AvatarSession/AvatarVideo";
+import { MicIcon } from "./Icons";
 import { useStreamingAvatarSession } from "./logic/useStreamingAvatarSession";
 import { useVoiceChat } from "./logic/useVoiceChat";
 import { StreamingAvatarProvider, StreamingAvatarSessionState } from "./logic";
@@ -26,6 +27,7 @@ const DEFAULT_CONFIG: StartAvatarRequest = {
   },
   language: "fr",
   voiceChatTransport: VoiceChatTransport.WEBSOCKET,
+  activityIdleTimeout: 60,
   sttSettings: {
     provider: STTProvider.DEEPGRAM,
   },
@@ -158,11 +160,33 @@ function InteractiveAvatar() {
       className="flex min-h-screen w-screen items-center justify-center bg-black"
       onClick={handleScreenClick}
     >
-      <div className="relative h-screen w-screen">
-        <AvatarVideo ref={mediaStream} />
+      <div className="relative h-screen w-screen overflow-hidden">
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          src="/idle.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+        <div
+          className={`absolute inset-0 transition-opacity duration-300 ${
+            sessionState === StreamingAvatarSessionState.CONNECTED
+              ? "opacity-100"
+              : "opacity-0"
+          }`}
+        >
+          <AvatarVideo ref={mediaStream} />
+        </div>
         {sessionState === StreamingAvatarSessionState.INACTIVE && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white">
-            Cliquez pour lancer l'avatar vocal (cliquez de nouveau pour arrêter)
+          <div className="pointer-events-none absolute top-6 right-6 text-white">
+            <div className="relative flex h-[84px] w-[84px] items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-600" />
+              <span className="relative inline-flex h-[84px] w-[84px] items-center justify-center rounded-full bg-red-600">
+                <span className="absolute h-[84px] w-[84px] animate-pulse rounded-full bg-white" />
+                <MicIcon size={36} className="relative text-red-600" />
+              </span>
+            </div>
           </div>
         )}
         {sessionState === StreamingAvatarSessionState.CONNECTING && (
